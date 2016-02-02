@@ -49,6 +49,7 @@ svg path:hover {
 }
 #map-legend {
 	margin-bottom: 10px;
+	max-width: 800px;
 }
 .legend-block {
 	display: inline-block;
@@ -129,6 +130,7 @@ svg path:hover {
 	  <hr/>
 	    <footer>
         <p>Developed by Nick Burkhart.  Election results are retrieved programmatically from external sources and are not guaranteed to be accurate.</p>
+        <p><a href="https://www.flickr.com/photos/tabor-roeder/5360163197/in/photolist-9aEeLR-pir6Ch-5yVa2X-dQFzZC-8rCZAp-BV648m-98hy7f-u4NbNH-qSBYah-mWZUM8-JDu8k-oGh2Pg-nbq8VD-yT4bRv-8XdesP-owhwQB-hsZ7Lk-CEhzqQ-Beoh7a-uTgYnE-nahYmG-d9Ukkg-qyi7nh-Hx5dn-hUcRsF-qkhQQa-4r2QMu-a8h1SU-hUdsFY-dcBoGn-i7WL3d-qUWLfb-2Ukm4c-7ABbhX-hP2w1y-9a7aJM-AGjfh-4jaezF-cUJf7U-wakZkE-rm71xr-4CaLsX-e7VGQY-e79Gm4-wfc1Hi-dGeRHL-8Z35Ed-dGetYS-qVkfqM-AmHeHW">Banner Photo Attribution</a> |  <a href="https://github.com/nicanor-b/iowa-caucus-map">Download Source on GitHub</a> | This project's source code is open and use is governed by the <a href="https://opensource.org/licenses/MIT">MIT License</a>.</p>
       </footer>
 	    </div>
     </div>
@@ -144,7 +146,7 @@ function render_map(p) {
 	var width = 900,
     height = 600;
 	
-	var fill = d3.scale.category10();
+	var fill = d3.scale.category20();
 	
 	function getWinner(candidates) {
 		if (candidates.length == 0) return '#ccc';
@@ -154,10 +156,10 @@ function render_map(p) {
 			$.each(candidates, function(key,candidate) {
 				if (candidate.Result > maxVotes) {
 					maxVotes = candidate.Result;
-					winner = candidate.LastName;
+					winner = candidate.Candidate.LastName;
 				}
 			})
-			return fill(Object.keys(candidate).indexOf(winner));
+			return fill(Object.keys(candidates_global).indexOf(winner));
 		}
 	}
 	
@@ -182,6 +184,7 @@ function render_map(p) {
 	  if (p == "d") s_url = 'https://www.idpcaucuses.com/api/precinctcandidateresults?time='+Date.now();
 	  else s_url = 'https://www.iagopcaucuses.com/api/precinctcandidateresults?time='+Date.now();
 	  d3.json(s_url, function(error_d, results_raw) {
+		  console.log(results_raw);
 		  var results = {};
 		  var results_by_county = {};
 		  $.each(results_raw.PrecinctResults, function(key,prec) {
@@ -207,26 +210,31 @@ function render_map(p) {
 					  precincts_reporting++;
 				  	  $.each(prec.Candidates, function(ckey, candidate) {
 					  	  // Global candidate data aggregation
-					  	  candidates_global[candidate.LastName] = candidates_global[candidate.LastName] || { "fullName": candidate.DisplayName, "firstName": candidate.FirstName, "lastName": candidate.LastName, "votes": 0 };
-					  	  candidates_global[candidate.LastName].votes = candidates_global[candidate.LastName].votes + candidate.Result;
-					  	  total_votes = total_votes + candidate.Result;
+					  	  candidates_global[candidate.Candidate.LastName] = candidates_global[candidate.Candidate.LastName] || { "fullName": candidate.Candidate.DisplayName, "firstName": candidate.Candidate.FirstName, "lastName": candidate.Candidate.LastName, "votes": 0 };
+					  	  if (typeof candidate.Result != 'undefined') candidates_global[candidate.Candidate.LastName].votes = candidates_global[candidate.Candidate.LastName].votes + candidate.Result;
+					  	  if (typeof candidate.Result != 'undefined') total_votes = total_votes + candidate.Result;
 					  	  // Precinct level chart
-					  	  t = t + "<tr><td>" + candidate.DisplayName + "</td><td>" + candidate.Result + "</td><td>" + candidate.WinPercentage + "</td></tr>";
+					  	  if (typeof candidate.Result != "undefined") votes = candidate.Result;
+							else votes = " -- ";
+							if (typeof candidate.WinPercentage != "undefined") winpct = " (" + Math.round(candidate.WinPercentage*100*10)/10 + "%)";
+							else winpct = " -- ";
+					  	  t = t + "<tr><td>" + candidate.Candidate.DisplayName + "</td><td>" + votes + "</td><td>" + winpct + "</td></tr>";
 					  });
 				  }
 			  	  t = t + "</tbody></table>";
 			  	  $("#results-accordion #pb-"+sankey).append("<h4>Precinct: "+prec.NAME+"</h4>"+t);
 			  });
 		  });
-		  $("#reporting").html(precincts_reporting + " of " + total_precincts + " precincts reporting (" + (precincts_reporting/total_precincts*100) + "%)")
+		  $("#reporting").html(precincts_reporting + " of " + total_precincts + " precincts reporting (" + Math.round((precincts_reporting/total_precincts*100)*10)/10 + "%)")
 		  t = "<table class='table table-bordered'><thead><th>Candidate</th><th>Votes</th><th>Percentage</th></thead><tbody>";
 		  legend = "<div id='map-legend'>";
 		  if (Object.keys(candidates_global).length == 0) {
 			  t = t + "<tr><td><i>results not yet reported</i></td><td><i>results not yet reported</i></td><td><i>results not yet reported</i></td></tr>";
 		  }
+		  console.log(candidates_global);
 		  $.each(candidates_global, function(id,candidate) {
-			  t = t + "<tr><td>" + candidate.fullName + "</td><td>" + candidate.votes + "</td><td>" + Math.round(candidate.votes/total_votes*100)/100 + "%</td></tr>";
-			  legend = legend + "<div class='legend-block'><div class='legend-color' style='background-color:"+fill(Object.keys(candidate).indexOf(candidate.lastName))+"></div><div class='legend-label'>"+candidate.lastName+"</div></div>";
+			  t = t + "<tr><td>" + candidate.fullName + "</td><td>" + candidate.votes + "</td><td>" + Math.round(candidate.votes/total_votes*100*100)/100 + "%</td></tr>";
+			  legend = legend + "<div class='legend-block'><div class='legend-color' style='background-color:"+fill(Object.keys(candidates_global).indexOf(candidate.lastName))+"'></div><div class='legend-label'>"+candidate.lastName+"</div></div>";
 		  });
 		  t = t + "</tbody></table>";
 		  legend = legend + "</div>";
@@ -247,7 +255,11 @@ function render_map(p) {
 				else {
 					h = h + "<table class='table'><thead><th>Candidate</th><th>Votes (%)</th></thead><tbody>";
 					$.each(d.properties.Candidates, function(id,candidate) {
-						h = h + "<tr><td>" + candidate.DisplayName + "</td><td>" + candidate.Result + " (" + candidate.WinPercentage + "%)</td></tr>";
+						if (typeof candidate.Result != "undefined") votes = candidate.Result;
+						else votes = " -- ";
+						if (typeof candidate.WinPercentage != "undefined") winpct = " (" + Math.round(candidate.WinPercentage*100*10)/10 + "%)";
+						else winpct = " -- ";
+						h = h + "<tr><td>" + candidate.Candidate.DisplayName + "</td><td>" + votes + winpct + "</td></tr>";
 					});
 					h = h + "</tbody></table>";
 				}
