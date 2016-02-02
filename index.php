@@ -143,6 +143,7 @@ function render_map(p) {
 	$('#map').empty();
 	$('#results-accordion').empty();
 	$('#map-legend').empty();
+	$('#sw-results-table').empty();
 	var width = 900,
     height = 600;
 	
